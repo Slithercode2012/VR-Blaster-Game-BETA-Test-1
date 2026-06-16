@@ -2,42 +2,69 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>3D Titan Rivals Engine</title>
+    <title>Titan Rivals: Live 3D Multiplayer</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #0b0f19; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; width: 100vw; height: 100vh; }
         #ui {
             position: absolute; top: 20px; left: 20px; color: white;
-            text-shadow: 2px 2px 4px black; pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8); pointer-events: none;
+        }
+        #lobby-panel {
+            position: absolute; top: 20px; right: 20px; background: rgba(15, 23, 42, 0.85);
+            padding: 15px; border-radius: 8px; color: #00ffcc; border: 1px solid #1e293b;
+            min-width: 180px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        #chat-box {
+            position: absolute; bottom: 20px; left: 20px; background: rgba(15, 23, 42, 0.7);
+            padding: 10px; border-radius: 6px; width: 300px; max-height: 150px;
+            overflow-y: auto; color: white; font-size: 13px; display: flex; flex-direction: column;
         }
         #crosshair {
             position: absolute; top: 50%; left: 50%;
-            width: 8px; height: 8px; background: #00ffcc;
+            width: 10px; height: 10px; border: 2px solid #00ffcc;
             border-radius: 50%; transform: translate(-50%, -50%);
-            pointer-events: none; box-shadow: 0 0 8px #00ffcc;
+            pointer-events: none;
         }
-        #click-screen {
+        #menu-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); color: white; display: flex;
+            background: rgba(10, 15, 30, 0.9); color: white; display: flex;
             flex-direction: column; justify-content: center; align-items: center;
-            text-align: center; cursor: pointer;
         }
+        input, button {
+            padding: 12px 20px; font-size: 16px; margin: 10px; border-radius: 6px; border: none;
+        }
+        input { background: #1e293b; color: white; border: 1px solid #334155; }
+        button { background: #00ffcc; color: #0f172a; font-weight: bold; cursor: pointer; }
+        button:hover { background: #00ccaa; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 </head>
 <body>
 
     <div id="crosshair"></div>
+    
     <div id="ui">
-        <h2>TITAN RIVALS 3D</h2>
-        <div>HP: <span id="hp">100</span>/100</div>
-        <div>Score / RP: <span id="score">0</span></div>
-        <div style="margin-top: 10px; color: #aaa;">WASD to Move | Mouse to Look | Left Click to Shoot</div>
+        <h2 style="margin:0; color:#00ffcc; letter-spacing:1px;">TITAN RIVALS 3D</h2>
+        <div style="font-size:18px; margin-top:5px;">HP: <span id="hp" style="color:#ff4444; font-weight:bold;">100</span>/100</div>
+        <div style="font-size:16px;">Rank Score: <span id="score" style="color:#eab308;">0</span></div>
     </div>
 
-    <div id="click-screen">
-        <h1>CLICK HERE TO PLAY IN 3D</h1>
-        <p>Use your mouse to look around and WASD to walk!</p>
+    <div id="lobby-panel">
+        <div style="font-weight:bold; margin-bottom:5px; border-bottom:1px solid #334155; padding-bottom:3px;">📡 CONNECTED LOBBY</div>
+        <div id="player-list">Waiting for connection...</div>
+    </div>
+
+    <div id="chat-box">
+        <div style="color:#888; font-style:italic;">System: Enter match to open comms...</div>
+    </div>
+
+    <div id="menu-overlay">
+        <h1 style="color:#00ffcc; font-size:42px; margin-bottom:5px;">TITAN RIVALS: LIVE NET</h1>
+        <p style="color:#94a3b8; margin-bottom:20px;">Real-Time Multiplayer Sandbox with Aggressive Drone Bots</p>
+        <input type="text" id="username-input" placeholder="Enter Callisgn / Name" maxlength="12">
+        <button id="start-btn">DEPLOY TO MAIN ARENA</button>
     </div>
 
     <script src="game.js"></script>
