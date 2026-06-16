@@ -56,7 +56,6 @@ function createHumanoidMesh() {
     const leftLegGeo = new THREE.BoxGeometry(0.4, 1.0, 0.4);
     const leftLeg = new THREE.Mesh(leftLegGeo, bootMat);
     leftLeg.position.set(-0.35, 0.5, 0);
-    // Offset center point to the hip line for realistic swinging
     leftLegGeo.translate(0, -0.4, 0);
     leftLeg.position.y = 1.2;
     humanGroup.add(leftLeg);
@@ -83,7 +82,6 @@ function createHumanoidMesh() {
     rightArmGeo.translate(0, -0.5, 0);
     humanGroup.add(rightArm);
 
-    // Store references to the limbs inside the object group for animations later
     humanGroup.userData = {
         leftLeg: leftLeg,
         rightLeg: rightLeg,
@@ -96,7 +94,7 @@ function createHumanoidMesh() {
 
 // --- SPAWN AI BOTS ---
 function spawnBot(id) {
-    const bot = createHumanoidMesh(); // Builds full human shape instead of a cube!
+    const bot = createHumanoidMesh(); 
     bot.position.set((Math.random() - 0.5) * 60, 0, (Math.random() - 0.5) * 60);
     
     bot.userData.id = id;
@@ -104,13 +102,12 @@ function spawnBot(id) {
     bot.userData.targetX = bot.position.x;
     bot.userData.targetZ = bot.position.z;
     bot.userData.timer = 0;
-    bot.userData.animTime = Math.random() * 10; // Randomize walk cycles
+    bot.userData.animTime = Math.random() * 10; 
 
     scene.add(bot);
     bots.push(bot);
 }
 
-// Spawn 6 active custom moving human bots
 for (let i = 0; i < 6; i++) spawnBot("Rival_Bot_" + i);
 
 // --- MULTIPLAYER SETUP (PUBNUB NETWORKING) ---
@@ -126,10 +123,9 @@ function initMultiplayer() {
             const data = event.message;
             if (event.publisher === myID) return;
 
-            // Update human-shaped multiplayer avatar tracks live
             if (data.type === "move") {
                 if (!networkPlayers[event.publisher]) {
-                    networkPlayers[event.publisher] = createHumanoidMesh(); // Other players are human shapes too!
+                    networkPlayers[event.publisher] = createHumanoidMesh(); 
                     scene.add(networkPlayers[event.publisher]);
                     addSystemMessage(`${data.name} joined the active map room.`);
                 }
@@ -140,7 +136,7 @@ function initMultiplayer() {
             if (data.type === "shoot_bot") {
                 const targetBot = bots.find(b => b.userData.id === data.botId);
                 if (targetBot) {
-                    targetBot.position.set(0, -50, 0); // Hide bot
+                    targetBot.position.set(0, -50, 0); 
                     addSystemMessage(`💥 ${data.name} neutralized ${data.botId}!`);
                     setTimeout(() => { targetBot.position.set((Math.random() - 0.5) * 50, 0, (Math.random() - 0.5) * 50); }, 2000);
                 }
@@ -197,13 +193,22 @@ function addSystemMessage(text) {
     chat.scrollTop = chat.scrollHeight;
 }
 
-// --- FPS CONTROLS & CAMERA MOVEMENT ---
+// --- FULLY UNLOCKED CAMERA LOOK LOGIC ---
 document.addEventListener('mousemove', (e) => {
     if (document.pointerLockElement !== document.body) return;
+    
+    // Tracks horizontal (left/right) rotation
     yaw -= e.movementX * 0.0022;
+    // Tracks vertical (up/down) rotation
     pitch -= e.movementY * 0.0022;
-    pitch = Math.max(-Math.PI / 2.4, Math.min(Math.PI / 2.4, pitch));
-    camera.rotation.set(0, 0, 0); camera.rotation.y = yaw; camera.rotation.x = pitch;
+    
+    // Clamping protects your neck from snapping completely backward
+    pitch = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, pitch));
+    
+    // Direct euler configuration mapping allows true look tracking!
+    camera.rotation.order = "YXZ";
+    camera.rotation.y = yaw;
+    camera.rotation.x = pitch;
 });
 
 document.addEventListener('keydown', (e) => {
@@ -223,12 +228,9 @@ document.addEventListener('mousedown', () => {
     if (document.pointerLockElement !== document.body) return;
 
     raycaster.setFromCamera(screenCenter, camera);
-    
-    // Find intersections with child pieces inside the robot/human character groups
     const targetHits = raycaster.intersectObjects(scene.children, true);
 
     if (targetHits.length > 0) {
-        // Trace back the clicked piece up to its main parent human group
         let hitObject = targetHits[0].object;
         while (hitObject.parent && hitObject.parent !== scene) {
             hitObject = hitObject.parent;
@@ -239,7 +241,7 @@ document.addEventListener('mousedown', () => {
 
             if (hitObject.userData.hp <= 0) {
                 hitObject.userData.hp = 40;
-                hitObject.position.set(0, -100, 0); // Drop out of view temporarily
+                hitObject.position.set(0, -100, 0); 
 
                 score += 50;
                 document.getElementById('score').innerText = score;
@@ -260,7 +262,7 @@ document.addEventListener('mousedown', () => {
 
 // --- CORE FRAME RENDER LOOP (60FPS CONTINUOUS REFRESH) ---
 const clock = new THREE.Clock();
-camera.position.set(0, 1.8, 10); // Elevated camera view to meet character eye positions
+camera.position.set(0, 1.8, 10); 
 
 function animate() {
     requestAnimationFrame(animate);
@@ -284,38 +286,32 @@ function animate() {
     // --- HUMANOID BOT MOVEMENT & WALKING LIMB ANIMATION ---
     bots.forEach(bot => {
         bot.userData.timer += dt;
-        bot.userData.animTime += dt * 7; // Speed of limb swing rate
+        bot.userData.animTime += dt * 7; 
 
-        // 1. Path coordinates recalculator
         if (bot.userData.timer > 4) {
             bot.userData.targetX = bot.position.x + (Math.random() - 0.5) * 20;
             bot.userData.targetZ = bot.position.z + (Math.random() - 0.5) * 20;
             bot.userData.timer = 0;
         }
 
-        // Keep previous spot data to compute angles
         const oldX = bot.position.x;
         const oldZ = bot.position.z;
 
-        // Smooth translation forward
         bot.position.x += (bot.userData.targetX - bot.position.x) * dt * 0.4;
         bot.position.z += (bot.userData.targetZ - bot.position.z) * dt * 0.4;
 
-        // Face the direction they are actively running towards
         const dx = bot.position.x - oldX;
         const dz = bot.position.z - oldZ;
         if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
             bot.rotation.y = Math.atan2(dx, dz);
             
-            // 2. RUNNING ANIMATION PHYSICS: Swing legs and arms using math sine waves
             const swing = Math.sin(bot.userData.animTime) * 0.6;
-            bot.children[2].rotation.x = swing;  // Left Leg forward
-            bot.children[3].rotation.x = -swing; // Right Leg backward
-            bot.children[4].rotation.x = -swing; // Left Arm backward
-            bot.children[5].rotation.x = swing;  // Right Arm forward
+            bot.children[2].rotation.x = swing;  
+            bot.children[3].rotation.x = -swing; 
+            bot.children[4].rotation.x = -swing; 
+            bot.children[5].rotation.x = swing;  
         }
 
-        // Damage Tracker: Check if any bot hunts down and touches player position boundaries
         const dist = camera.position.distanceTo(bot.position);
         if (dist < 2.5 && hp > 0) {
             hp -= 20 * dt;
