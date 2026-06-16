@@ -1,49 +1,62 @@
 using System;
+using System.Collections.Generic;
 
 class Program {
     static void Main(string[] args) {
-        Console.WriteLine("=== Advanced VR Battle Simulation Started ===");
+        Console.WriteLine("=== VR MULTIPLAYER CO-OP LOBBY ===");
+        Console.WriteLine("Status: Connected to Server [US-East]");
 
-        // 1. Setup our Player and an Enemy
-        Player player = new Player("Hero", 100);
-        Enemy bossDrone = new Enemy("Heavy Titan Drone", 120);
+        // 1. Create our Multiplayer Lobby
+        List<Player> lobbyPlayers = new List<Player>();
+        lobbyPlayers.Add(new Player("Player1_Slither", 100));
+        lobbyPlayers.Add(new Player("Player2_Guest", 100));
 
-        // 2. Setup Arsenal (Different Weapons)
-        // VRBlaster(Name, MaxAmmo, BodyDamage, HeadshotMultiplier)
-        VRBlaster plasmaPistol = new VRBlaster("Plasma Pistol", 6, 15, 2.0f); // 2x headshot damage
-        VRBlaster laserRifle = new VRBlaster("Heavy Laser Rifle", 3, 35, 1.5f);  // Huge body damage, 1.5x headshot
+        // 2. Spawn a massive Raid Boss Drone
+        Enemy raidBoss = new Enemy("MEGA TITAN RAID BOSS", 250);
 
-        player.ShowStatus();
-        bossDrone.ShowStatus();
+        // 3. Give players their weapons
+        VRBlaster plasmaPistol = new VRBlaster("Plasma Pistol", 6, 15, 2.0f);
+        VRBlaster railGun = new VRBlaster("Heavy Railgun", 2, 45, 1.5f);
 
-        Console.WriteLine("\n--- ROUND 1: Plasma Pistol Run ---");
-        plasmaPistol.OnGrab();
-        
-        // Fire a few rounds with the pistol
-        plasmaPistol.ShootEnemy(bossDrone);
-        plasmaPistol.ShootEnemy(bossDrone);
-        plasmaPistol.ShootEnemy(bossDrone);
+        Console.WriteLine($"\n[Server] Match Started! {lobbyPlayers.Count} players vs 1 Boss.");
+        foreach (var p in lobbyPlayers) {
+            p.ShowStatus();
+        }
+        raidBoss.ShowStatus();
 
-        Console.WriteLine("\n--- ROUND 2: Switching Weapons to Heavy Rifle ---");
-        laserRifle.OnGrab(); // Equip the bigger weapon
+        // --- TURN 1: Player 1 Attacks ---
+        Console.WriteLine($"\n--- [ROUND 1] {lobbyPlayers[0].name}'s Turn ---");
+        plasmaPistol.OnGrab(lobbyPlayers[0].name);
+        plasmaPistol.ShootEnemy(raidBoss);
+        plasmaPistol.ShootEnemy(raidBoss);
 
-        // Fire the rifle to deal massive damage
-        laserRifle.ShootEnemy(bossDrone);
-        
-        // Enemy retaliates!
-        Console.WriteLine("\n[Action] The Heavy Titan Drone charges its lasers and blasts you!");
-        bossDrone.AttackPlayer(player, 45);
-        player.ShowStatus();
+        // --- TURN 2: Player 2 Attacks ---
+        Console.WriteLine($"\n--- [ROUND 2] {lobbyPlayers[1].name}'s Turn ---");
+        railGun.OnGrab(lobbyPlayers[1].name);
+        railGun.ShootEnemy(raidBoss);
 
-        // Finish the fight with the rifle
-        Console.WriteLine("\n--- ROUND 3: Final Assault ---");
-        laserRifle.ShootEnemy(bossDrone);
-        laserRifle.ShootEnemy(bossDrone); 
+        // --- TURN 3: Boss Target Selection (Multiplayer Mechanic) ---
+        Console.WriteLine("\n--- [BOSS PHASE] Raid Boss Retaliates! ---");
+        // The boss randomly chooses a player in the lobby to attack
+        raidBoss.AttackRandomPlayer(lobbyPlayers, 40);
 
-        // Calculate total score combined from both weapons
-        int totalScore = plasmaPistol.score + laserRifle.score;
-        Console.WriteLine("\n=== Simulation Ended ===");
-        Console.WriteLine($"Final Combined Score: {totalScore} Points!");
+        // Show updated server status for both players
+        Console.WriteLine("\n[Server Sync] Updating Player Status:");
+        foreach (var p in lobbyPlayers) {
+            p.ShowStatus();
+        }
+
+        // --- TURN 4: Combined Firepower ---
+        Console.WriteLine("\n--- [FINAL ROUND] Combined Fire! ---");
+        plasmaPistol.OnGrab(lobbyPlayers[0].name);
+        plasmaPistol.ShootEnemy(raidBoss); // Player 1 shoots
+
+        railGun.OnGrab(lobbyPlayers[1].name);
+        railGun.ShootEnemy(raidBoss); // Player 2 shoots
+        railGun.ShootEnemy(raidBoss); // Player 2 finishes it!
+
+        Console.WriteLine("\n=== Match Ended ===");
+        Console.WriteLine($"Team Total Score: {plasmaPistol.score + railGun.score} Points!");
     }
 }
 
@@ -64,7 +77,7 @@ class Player {
         if (filledBars > 10) filledBars = 10;
         
         string healthBar = new string('█', filledBars) + new string('░', barLength - filledBars);
-        Console.WriteLine($"[PLAYER] {name} Health: {health}/100 [{healthBar}]");
+        Console.WriteLine($"[🌐 SERVER] {name} HP: {health}/100 [{healthBar}]");
     }
 }
 
@@ -74,38 +87,45 @@ class Enemy {
     public int health;
     public int maxHealth;
     public bool isDefeated = false;
+    private Random rand = new Random();
 
     public Enemy(string enemyName, int startHealth) {
         maxHealth = startHealth;
         health = startHealth;
+        name = enemyName;
     }
 
     public void ShowStatus() {
         if (isDefeated) {
-            Console.WriteLine($"[ENEMY] {name} is completely DESTROYED! [☠️]");
+            Console.WriteLine($"[BOSS] {name} is DEFEATED! 🏆");
         } else {
-            Console.WriteLine($"[ENEMY] {name} HP: {health}/{maxHealth}");
+            Console.WriteLine($"[BOSS] {name} HP: {health}/{maxHealth}");
         }
     }
 
-    public void AttackPlayer(Player targetPlayer, int damage) {
-        if (isDefeated) return;
-        Console.WriteLine($"*💥 BOOM!* {name} hits {targetPlayer.name} for {damage} damage!");
+    // Multiplayer Attack Logic: Picks a random player from the list
+    public void AttackRandomPlayer(List<Player> players, int damage) {
+        if (isDefeated || players.Count == 0) return;
+
+        int targetIndex = rand.Next(0, players.Count);
+        Player targetPlayer = players[targetIndex];
+
+        Console.WriteLine($"*🚨 LOCK ON!* {name} targets and blasts {targetPlayer.name} for {damage} damage!");
         targetPlayer.health -= damage;
     }
 }
 
-// ------------------- ADVANCED BLASTER CLASS -------------------
+// ------------------- BLASTER CLASS -------------------
 class VRBlaster {
     public string objectName;
-    public bool isGrabbed = false;
+    public string currentHolder = "None";
     public int ammoCount;
     public int maxAmmo;
     public int baseDamage;
     public float headshotMultiplier;
     public int score = 0;
     
-    private Random randomGenerator = new Random(); // Used to calculate hit locations
+    private Random randomGenerator = new Random();
 
     public VRBlaster(string name, int startingAmmo, int damage, float multiplier) {
         objectName = name;
@@ -115,58 +135,56 @@ class VRBlaster {
         headshotMultiplier = multiplier;
     }
 
-    public void OnGrab() {
-        isGrabbed = true;
-        Console.WriteLine($"[Weapon Swap] Equipped: {objectName} (Base Dmg: {baseDamage}, Max Ammo: {maxAmmo})");
+    // Pass the player's name so the server knows who picked it up
+    public void OnGrab(string playerName) {
+        currentHolder = playerName;
+        Console.WriteLine($"[Network Sync] {playerName} equipped the {objectName}.");
     }
 
     public void ShootEnemy(Enemy target) {
-        if (!isGrabbed) {
-            Console.WriteLine("❌ Error: Weapon not equipped.");
+        if (currentHolder == "None") {
+            Console.WriteLine("❌ Error: Gun is not held by any network player.");
             return;
         }
 
         if (target.isDefeated) {
-            Console.WriteLine($"*Click* {target.name} is already scraps.");
+            Console.WriteLine($"*Click* {target.name} is already down.");
             return;
         }
 
         if (ammoCount > 0) {
             ammoCount--;
             
-            // Determine hit location (70% chance body shot, 30% chance headshot)
-            bool isHeadshot = randomGenerator.Next(0, 100) < 30;
+            bool isHeadshot = randomGenerator.Next(0, 100) < 35; // 35% headshot chance
             int finalDamage = baseDamage;
             
             if (isHeadshot) {
                 finalDamage = (int)(baseDamage * headshotMultiplier);
-                score += 30; // More points for a headshot!
-                Console.WriteLine($"🎯 [HEADSHOT!] *CRITICAL HIT* with {objectName}! Dealt {finalDamage} damage to {target.name}!");
+                score += 30;
+                Console.WriteLine($"🎯 [HEADSHOT!] {currentHolder} hit a CRITICAL shot with {objectName}! Dealt {finalDamage} damage to {target.name}!");
             } else {
-                score += 10; // Standard points
-                Console.WriteLine($"💥 [Body Shot] Hit {target.name} with {objectName} for {finalDamage} damage.");
+                score += 10;
+                Console.WriteLine($"💥 [Body Shot] {currentHolder} shot {target.name} with {objectName} for {finalDamage} damage.");
             }
 
-            Console.WriteLine($"Weapon Status -> Ammo remaining: {ammoCount}/{maxAmmo}");
             target.health -= finalDamage;
 
             if (target.health <= 0) {
                 target.health = 0;
                 target.isDefeated = true;
-                score += 100; // Massive bonus for defeating the boss drone
-                Console.WriteLine($"🏆 TARGET DESTROYED! You defeated the {target.name}!");
+                score += 150; // Big multiplayer boss kill bonus!
+                Console.WriteLine($"🏆 BOSS DESTROYED! {currentHolder} landed the final blow!");
             }
             target.ShowStatus();
         } else {
-            Console.WriteLine($"*Click Click* {objectName} is empty! Automatic reload initiated...");
+            Console.WriteLine($"*Click Click* {objectName} is empty! {currentHolder} is reloading...");
             Reload();
-            // Fire again after reloading
             ShootEnemy(target);
         }
     }
 
     public void Reload() {
         ammoCount = maxAmmo;
-        Console.WriteLine($"*Ch-Chck!* {objectName} reloaded back to {maxAmmo}.");
+        Console.WriteLine($"*Ch-Chck!* {objectName} reloaded back to {maxAmmo} shots.");
     }
 }
