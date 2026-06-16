@@ -3,101 +3,164 @@ using System.Collections.Generic;
 
 class Program {
     static void Main(string[] args) {
-        Console.WriteLine("=== VR MULTIPLAYER CO-OP LOBBY ===");
-        Console.WriteLine("Status: Connected to Server [US-East]");
+        Console.WriteLine("=== TITAN RIVALS: ULTIMATE EDITION ===");
+        Console.WriteLine("Status: Connected to Live Servers");
 
-        // 1. Create our Multiplayer Lobby
-        List<Player> lobbyPlayers = new List<Player>();
-        lobbyPlayers.Add(new Player("Player1_Slither", 100));
-        lobbyPlayers.Add(new Player("Player2_Guest", 100));
+        // 1. Create our Players with Levels and Ranks
+        Player player1 = new Player("Slithercode2012", 100, 15, 1250); // lvl 15, 1250 Rank Points
+        Player player2 = new Player("Guest_Player", 100, 3, 900);
 
-        // 2. Select a Random Map (CoD Style)
-        GameMap currentMap = MapManager.GetRandomMap();
-        Console.WriteLine($"\n[MATCHMAKING] Map Voted: {currentMap.mapName.ToUpper()}!");
-        Console.WriteLine($"[MAP MODIFIER] {currentMap.description}");
+        // 2. Setup Upgradable Weapons (Name, MaxAmmo, BaseDamage, Level)
+        UpgradableBlaster pistol = new UpgradableBlaster("Plasma Pistol", 6, 15, 1);
+        UpgradableBlaster rifle = new UpgradableBlaster("Vortex Rifle", 4, 30, 4); // Already Level 4!
 
-        // 3. Spawn the Boss Drone
-        Enemy raidBoss = new Enemy("MEGA TITAN RAID BOSS", 250);
+        // Upgrade a gun on the spot to show how it works
+        Console.WriteLine("\n[Weapon Bench] Upgrading your arsenal...");
+        pistol.UpgradeWeapon(); // Levels up to 2, increasing its damage!
 
-        // 4. Setup Arsenal (Name, MaxAmmo, BodyDamage, HeadshotMultiplier)
-        VRBlaster plasmaPistol = new VRBlaster("Plasma Pistol", 6, 15, 2.0f);
-        VRBlaster railGun = new VRBlaster("Heavy Railgun", 2, 45, 1.5f);
+        // 3. SELECT GAME MODE (Options: "Normal", "Ranked", "Zombies")
+        // Change this string to test different modes!
+        string chosenMode = "Ranked"; 
 
-        Console.WriteLine($"\n[Server] Match Started on {currentMap.mapName}!");
-        raidBoss.ShowStatus();
+        Console.WriteLine($"\n[MATCHMAKING] Loading Mode: {chosenMode.ToUpper()}...");
 
-        // --- ROUND 1: Player 1 Attacks ---
-        Console.WriteLine($"\n--- [ROUND 1] {lobbyPlayers[0].name}'s Turn ---");
-        plasmaPistol.OnGrab(lobbyPlayers[0].name);
-        // Map damage modifiers apply here!
-        plasmaPistol.ShootEnemy(raidBoss, currentMap);
+        // 4. Run the Game Mode Logic
+        if (chosenMode == "Zombies") {
+            RunZombiesMode(player1, pistol);
+        } else if (chosenMode == "Ranked") {
+            RunCompetitiveMatch(player1, player2, rifle, true);
+        } else {
+            RunCompetitiveMatch(player1, player2, rifle, false);
+        }
+    }
 
-        // --- ROUND 2: Player 2 Attacks ---
-        Console.WriteLine($"\n--- [ROUND 2] {lobbyPlayers[1].name}'s Turn ---");
-        railGun.OnGrab(lobbyPlayers[1].name);
-        railGun.ShootEnemy(raidBoss, currentMap);
+    // --- ZOMBIES MODE SYSTEM ---
+    static void RunZombiesMode(Player player, UpgradableBlaster weapon) {
+        Console.WriteLine("\n🧟!!! ZOMBIES MODE: WAVE 1 !!!🧟");
+        Enemy zombie1 = new Enemy("Walker Zombie", 40);
+        Enemy zombie2 = new Enemy("Runner Zombie", 30);
 
-        // --- ROUND 3: Boss Attacks Back ---
-        Console.WriteLine("\n--- [BOSS PHASE] Raid Boss Retaliates! ---");
-        // Tight maps increase enemy damage!
-        int bossDamage = 30 + currentMap.enemyDamageModifier; 
-        raidBoss.AttackRandomPlayer(lobbyPlayers, bossDamage);
+        weapon.OnGrab(player.name);
+        
+        // Blast through the horde
+        Console.WriteLine("\n[Action] Clearing the first line of defense!");
+        weapon.ShootEnemy(zombie1);
+        weapon.ShootEnemy(zombie2);
+        weapon.ShootEnemy(zombie1); // Should defeat the first one
 
-        // Show updated server status
-        Console.WriteLine("\n[Server Sync] Updating Team Status:");
-        foreach (var p in lobbyPlayers) {
-            p.ShowStatus();
+        Console.WriteLine("\n[Action] The undead crawl closer...");
+        zombie2.AttackPlayer(player, 15);
+        player.ShowStatus();
+    }
+
+    // --- NORMAL / RANKED MULTIPLAYER SYSTEM ---
+    static void RunCompetitiveMatch(Player p1, Player p2, UpgradableBlaster weapon, bool isRanked) {
+        Enemy raidBoss = new Enemy("Rival Apex Drone", 140);
+        
+        if (isRanked) {
+            Console.WriteLine($"🏆 RANKED MATCH Active. Lobby Average Tier: {p1.GetRankTier()}");
         }
 
-        // --- ROUND 4: Final Assault ---
-        Console.WriteLine("\n--- [FINAL ROUND] Combined Fire! ---");
-        plasmaPistol.OnGrab(lobbyPlayers[0].name);
-        plasmaPistol.ShootEnemy(raidBoss, currentMap);
+        weapon.OnGrab(p1.name);
+        weapon.ShootEnemy(raidBoss);
+        weapon.ShootEnemy(raidBoss);
 
-        railGun.OnGrab(lobbyPlayers[1].name);
-        railGun.ShootEnemy(raidBoss, currentMap);
+        Console.WriteLine("\n[Action] Enemy retaliation strike incoming!");
+        raidBoss.AttackPlayer(p1, 35);
+        p1.ShowStatus();
 
-        Console.WriteLine("\n=== Match Ended ===");
-        Console.WriteLine($"Team Total Score: {plasmaPistol.score + railGun.score} Points!");
+        // Finish the match
+        weapon.ShootEnemy(raidBoss);
+        weapon.ShootEnemy(raidBoss); // Finishes it off
+
+        Console.WriteLine("\n=== Match Finished ===");
+        if (isRanked && raidBoss.isDefeated) {
+            int rpGained = 25;
+            p1.rankPoints += rpGained;
+            Console.WriteLine($"📈 Victory! {p1.name} gained +{rpGained} Rank Points! New Tier: {p1.GetRankTier()} ({p1.rankPoints} RP)");
+        }
     }
 }
 
-// ------------------- MAP SYSTEM -------------------
-class GameMap {
-    public string mapName;
-    public string description;
-    public int playerDamageModifier; // Extra damage players deal on this map
-    public int enemyDamageModifier;  // Extra damage enemies deal on this map
+// ------------------- UPGRADABLE BLASTER CLASS -------------------
+class UpgradableBlaster {
+    public string weaponName;
+    public string currentHolder = "None";
+    public int ammoCount;
+    public int maxAmmo;
+    public int baseDamage;
+    public int weaponLevel;
+    private Random rand = new Random();
 
-    public GameMap(string name, string desc, int playerMod, int enemyMod) {
-        mapName = name;
-        description = desc;
-        playerDamageModifier = playerMod;
-        enemyDamageModifier = enemyMod;
+    public UpgradableBlaster(string name, int ammo, int dmg, int lvl) {
+        weaponName = name;
+        maxAmmo = ammo;
+        ammoCount = ammo;
+        baseDamage = dmg;
+        weaponLevel = lvl;
+    }
+
+    public void UpgradeWeapon() {
+        weaponLevel++;
+        baseDamage += 5; // Adds +5 damage per level upgrade
+        Console.WriteLine($"⭐ LEVEL UP! {weaponName} is now Level {weaponLevel}! (Damage boosted to: {baseDamage})");
+    }
+
+    public void OnGrab(string playerName) {
+        currentHolder = playerName;
+        Console.WriteLine($"[Sync] {playerName} equipped Level {weaponLevel} {weaponName}.");
+    }
+
+    public void ShootEnemy(Enemy target) {
+        if (target.isDefeated) return;
+
+        if (ammoCount > 0) {
+            ammoCount--;
+            bool isHeadshot = rand.Next(0, 100) < 35;
+            int finalDamage = baseDamage;
+
+            if (isHeadshot) {
+                finalDamage = (int)(baseDamage * 2.0f);
+                Console.WriteLine($"🎯 [HEADSHOT!] {currentHolder} hit a CRIT with {weaponName}! Dealt {finalDamage} damage to {target.name}!");
+            } else {
+                Console.WriteLine($"💥 [Body Shot] {currentHolder} shot {target.name} for {finalDamage} damage.");
+            }
+
+            target.health -= finalDamage;
+
+            if (target.health <= 0) {
+                target.health = 0;
+                target.isDefeated = true;
+                Console.WriteLine($"🏆 TRIPLE KILL! {target.name} was wiped out!");
+            }
+            target.ShowStatus();
+        } else {
+            Console.WriteLine($"*Click Click* {weaponName} empty! Auto reloading...");
+            ammoCount = maxAmmo;
+            ShootEnemy(target);
+        }
     }
 }
 
-class MapManager {
-    public static GameMap GetRandomMap() {
-        List<GameMap> maps = new List<GameMap>();
-        // Add classic style maps
-        maps.Add(new GameMap("Shipment (CQC)", "Ultra tight spaces! Enemy attacks deal +15 more damage!", 0, 15));
-        maps.Add(new GameMap("Rust (Desert)", "High ground advantages! All players deal +10 bonus damage!", 10, 0));
-        maps.Add(new GameMap("Cyber Neon (Rivals Arena)", "Perfectly balanced test arena. No modifiers.", 0, 0));
-
-        Random rand = new Random();
-        return maps[rand.Next(0, maps.Count)];
-    }
-}
-
-// ------------------- PLAYER CLASS -------------------
+// ------------------- PLAYER CLASS WITH RANKS -------------------
 class Player {
     public string name;
     public int health;
+    public int accountLevel;
+    public int rankPoints; // Tracked for Ranked mode
 
-    public Player(string playerName, int startHealth) {
+    public Player(string playerName, int startHealth, int level, int rp) {
         name = playerName;
         health = startHealth;
+        accountLevel = level;
+        rankPoints = rp;
+    }
+
+    public string GetRankTier() {
+        if (rankPoints < 1000) return "Bronze III";
+        if (rankPoints < 1200) return "Silver I";
+        if (rankPoints < 1500) return "Gold II";
+        return "Diamond Apex";
     }
 
     public void ShowStatus() {
@@ -107,7 +170,7 @@ class Player {
         if (filledBars > 10) filledBars = 10;
         
         string healthBar = new string('█', filledBars) + new string('░', barLength - filledBars);
-        Console.WriteLine($"[🌐 SERVER] {name} HP: {health}/100 [{healthBar}]");
+        Console.WriteLine($"[USER] {name} (Lvl {accountLevel}) HP: {health}/100 [{healthBar}]");
     }
 }
 
@@ -117,7 +180,6 @@ class Enemy {
     public int health;
     public int maxHealth;
     public bool isDefeated = false;
-    private Random rand = new Random();
 
     public Enemy(string enemyName, int startHealth) {
         maxHealth = startHealth;
@@ -127,88 +189,15 @@ class Enemy {
 
     public void ShowStatus() {
         if (isDefeated) {
-            Console.WriteLine($"[BOSS] {name} is DEFEATED! 🏆");
+            Console.WriteLine($"[Target] {name} is CLEAR.");
         } else {
-            Console.WriteLine($"[BOSS] {name} HP: {health}/{maxHealth}");
+            Console.WriteLine($"[Target] {name} HP: {health}/{maxHealth}");
         }
     }
 
-    public void AttackRandomPlayer(List<Player> players, int damage) {
-        if (isDefeated || players.Count == 0) return;
-
-        int targetIndex = rand.Next(0, players.Count);
-        Player targetPlayer = players[targetIndex];
-
-        Console.WriteLine($"*🚨 LOCK ON* On this map, {name} hits {targetPlayer.name} for {damage} damage!");
+    public void AttackPlayer(Player targetPlayer, int damage) {
+        if (isDefeated) return;
+        Console.WriteLine($"*💥 ATTACK!* {name} dealt {damage} damage to {targetPlayer.name}!");
         targetPlayer.health -= damage;
-    }
-}
-
-// ------------------- BLASTER CLASS -------------------
-class VRBlaster {
-    public string objectName;
-    public string currentHolder = "None";
-    public int ammoCount;
-    public int maxAmmo;
-    public int baseDamage;
-    public float headshotMultiplier;
-    public int score = 0;
-    
-    private Random randomGenerator = new Random();
-
-    public VRBlaster(string name, int startingAmmo, int damage, float multiplier) {
-        objectName = name;
-        maxAmmo = startingAmmo;
-        ammoCount = startingAmmo;
-        baseDamage = damage;
-        headshotMultiplier = multiplier;
-    }
-
-    public void OnGrab(string playerName) {
-        currentHolder = playerName;
-        Console.WriteLine($"[Network Sync] {playerName} equipped the {objectName}.");
-    }
-
-    // Now accepts the active map to check for damage bonuses
-    public void ShootEnemy(Enemy target, GameMap activeMap) {
-        if (currentHolder == "None") return;
-        if (target.isDefeated) return;
-
-        if (ammoCount > 0) {
-            ammoCount--;
-            
-            bool isHeadshot = randomGenerator.Next(0, 100) < 35;
-            // Add map damage bonus to base damage
-            int mapBaseDamage = baseDamage + activeMap.playerDamageModifier;
-            int finalDamage = mapBaseDamage;
-            
-            if (isHeadshot) {
-                finalDamage = (int)(mapBaseDamage * headshotMultiplier);
-                score += 30;
-                Console.WriteLine($"🎯 [HEADSHOT!] {currentHolder} scored a CRIT on {activeMap.mapName}! Dealt {finalDamage} damage to {target.name}!");
-            } else {
-                score += 10;
-                Console.WriteLine($"💥 [Body Shot] {currentHolder} hit {target.name} for {finalDamage} damage.");
-            }
-
-            target.health -= finalDamage;
-
-            if (target.health <= 0) {
-                target.health = 0;
-                target.isDefeated = true;
-                score += 150;
-                Console.WriteLine($"🏆 MATCH WINNER! {currentHolder} secured the final kill on {activeMap.mapName}!");
-            }
-            target.ShowStatus();
-        } else {
-            Console.WriteLine($"*Click Click* {objectName} is empty! Automatic reload...");
-            Reload();
-            ShootEnemy(target, activeMap);
-        }
-    }
-
-    public void Reload() {
-        ammoCount = maxAmmo;
-        Console.WriteLine($"*Ch-Chck!* {objectName} reloaded.");
     }
 }
