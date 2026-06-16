@@ -6,9 +6,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
-    - name: Run the app
-      run: dotnet run
+
+    - name: Build and Run Application
+      run: |
+        dotnet build GameEngine.csproj
+        dotnet run --project GameEngine.csproj
