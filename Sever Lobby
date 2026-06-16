@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 public class ServerLobby {
     public string regionName;
-    public int currentPing; // Simulated network lag
+    public int currentPing; 
     private List<Player> connectedPlayers = new List<Player>();
 
     public ServerLobby(string region, int ping) {
@@ -13,14 +13,14 @@ public class ServerLobby {
 
     public void ConnectPlayer(Player player) {
         connectedPlayers.Add(player);
-        Console.WriteLine($"🌐 [Network] Player '{player.name}' successfully connected to [{regionName}] server. (Ping: {currentPing}ms)");
+        Console.WriteLine($"🌐 [Network] Player '{player.name}' joined the [{regionName}] gateway. (Ping: {currentPing}ms)");
     }
 
     public void ShowLobbyPlayers() {
-        Console.WriteLine($"\n=== Current Players in {regionName} Lobby ===");
+        Console.WriteLine($"\n=== Regional Lobby: {regionName.ToUpper()} ===");
         foreach (var player in connectedPlayers) {
             player.ShowStatus();
-            Console.WriteLine($"   Rank: {player.GetRankTier()}");
+            Console.WriteLine($"   Rank Tier: {player.GetRankTier()}");
         }
         Console.WriteLine("=============================================");
     }
