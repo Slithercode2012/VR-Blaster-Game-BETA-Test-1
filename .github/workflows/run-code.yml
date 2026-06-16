@@ -11,4 +11,4 @@ jobs:
       with:
         dotnet-version: '5.0.x'
     - name: Run the app
-      run: dotnet run main.cs
+      run: dotnet run
