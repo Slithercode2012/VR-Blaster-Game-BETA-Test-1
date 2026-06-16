@@ -38,7 +38,7 @@ class Program {
         // Finish the fight with the rifle
         Console.WriteLine("\n--- ROUND 3: Final Assault ---");
         laserRifle.ShootEnemy(bossDrone);
-        laserRifle.ShootEnemy(bossDrone); // Should trigger auto-reload if empty
+        laserRifle.ShootEnemy(bossDrone); 
 
         // Calculate total score combined from both weapons
         int totalScore = plasmaPistol.score + laserRifle.score;
@@ -76,7 +76,6 @@ class Enemy {
     public bool isDefeated = false;
 
     public Enemy(string enemyName, int startHealth) {
-        name = enemyName;
         maxHealth = startHealth;
         health = startHealth;
     }
@@ -161,10 +160,12 @@ class VRBlaster {
         } else {
             Console.WriteLine($"*Click Click* {objectName} is empty! Automatic reload initiated...");
             Reload();
+            // Fire again after reloading
+            ShootEnemy(target);
         }
     }
 
-    public void Reloader() {
+    public void Reload() {
         ammoCount = maxAmmo;
         Console.WriteLine($"*Ch-Chck!* {objectName} reloaded back to {maxAmmo}.");
     }
