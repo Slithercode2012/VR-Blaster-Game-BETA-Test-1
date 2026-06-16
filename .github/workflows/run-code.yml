@@ -1,0 +1,14 @@
+name: Run CSharp Code
+on: [push]
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '5.0.x'
+    - name: Run the app
+      run: dotnet run main.cs
