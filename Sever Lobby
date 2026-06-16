@@ -1,0 +1,27 @@
+using System;
+using System.Collections.Generic;
+
+public class ServerLobby {
+    public string regionName;
+    public int currentPing; // Simulated network lag
+    private List<Player> connectedPlayers = new List<Player>();
+
+    public ServerLobby(string region, int ping) {
+        regionName = region;
+        currentPing = ping;
+    }
+
+    public void ConnectPlayer(Player player) {
+        connectedPlayers.Add(player);
+        Console.WriteLine($"🌐 [Network] Player '{player.name}' successfully connected to [{regionName}] server. (Ping: {currentPing}ms)");
+    }
+
+    public void ShowLobbyPlayers() {
+        Console.WriteLine($"\n=== Current Players in {regionName} Lobby ===");
+        foreach (var player in connectedPlayers) {
+            player.ShowStatus();
+            Console.WriteLine($"   Rank: {player.GetRankTier()}");
+        }
+        Console.WriteLine("=============================================");
+    }
+}
