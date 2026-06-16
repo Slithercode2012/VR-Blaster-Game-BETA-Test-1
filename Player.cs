@@ -25,7 +25,7 @@ public class Player {
         int filledBars = health / 10;
         if (filledBars < 0) filledBars = 0;
         if (filledBars > 10) filledBars = 10;
-        
+
         string healthBar = new string('█', filledBars) + new string('░', barLength - filledBars);
         Console.WriteLine($"   [USER] {name} (Lvl {accountLevel}) HP: {health}/100 [{healthBar}]");
     }
