@@ -31,55 +31,118 @@ const bots = [];           // Stores local AI enemy bots
 let moveF = false, moveB = false, moveL = false, moveR = false;
 let yaw = 0, pitch = 0, score = 0, hp = 100;
 
-// Geometry layouts
-const avatarGeo = new THREE.CylinderGeometry(0.8, 0.8, 2.5, 8);
-const avatarMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x1d4ed8 });
-const botGeo = new THREE.BoxGeometry(1.8, 1.8, 1.8);
-const botMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.2 });
+// Materials for the Human Characters
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 }); // Red clothes
+const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.6 }); // Humanoid skin tone
+const bootMat = new THREE.MeshStandardMaterial({ color: 0x111111 });                 // Black shoes
+
+// --- FUNCTION TO BUILD A COMPOSITE 3D HUMAN CHARACTER ---
+function createHumanoidMesh() {
+    const humanGroup = new THREE.Group();
+
+    // 1. Torso (Body)
+    const torsoGeo = new THREE.BoxGeometry(1.2, 1.6, 0.6);
+    const torso = new THREE.Mesh(torsoGeo, bodyMat);
+    torso.position.y = 1.6;
+    humanGroup.add(torso);
+
+    // 2. Head
+    const headGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+    const head = new THREE.Mesh(headGeo, skinMat);
+    head.position.y = 2.75;
+    humanGroup.add(head);
+
+    // 3. Left Leg
+    const leftLegGeo = new THREE.BoxGeometry(0.4, 1.0, 0.4);
+    const leftLeg = new THREE.Mesh(leftLegGeo, bootMat);
+    leftLeg.position.set(-0.35, 0.5, 0);
+    // Offset center point to the hip line for realistic swinging
+    leftLegGeo.translate(0, -0.4, 0);
+    leftLeg.position.y = 1.2;
+    humanGroup.add(leftLeg);
+
+    // 4. Right Leg
+    const rightLegGeo = new THREE.BoxGeometry(0.4, 1.0, 0.4);
+    const rightLeg = new THREE.Mesh(rightLegGeo, bootMat);
+    rightLeg.position.set(0.35, 0.5, 0);
+    rightLegGeo.translate(0, -0.4, 0);
+    rightLeg.position.y = 1.2;
+    humanGroup.add(rightLeg);
+
+    // 5. Left Arm
+    const leftArmGeo = new THREE.BoxGeometry(0.35, 1.2, 0.35);
+    const leftArm = new THREE.Mesh(leftArmGeo, skinMat);
+    leftArm.position.set(-0.8, 2.0, 0);
+    leftArmGeo.translate(0, -0.5, 0);
+    humanGroup.add(leftArm);
+
+    // 6. Right Arm
+    const rightArmGeo = new THREE.BoxGeometry(0.35, 1.2, 0.35);
+    const rightArm = new THREE.Mesh(rightArmGeo, skinMat);
+    rightArm.position.set(0.8, 2.0, 0);
+    rightArmGeo.translate(0, -0.5, 0);
+    humanGroup.add(rightArm);
+
+    // Store references to the limbs inside the object group for animations later
+    humanGroup.userData = {
+        leftLeg: leftLeg,
+        rightLeg: rightLeg,
+        leftArm: leftArm,
+        rightArm: rightArm
+    };
+
+    return humanGroup;
+}
 
 // --- SPAWN AI BOTS ---
 function spawnBot(id) {
-    const bot = new THREE.Mesh(botGeo, botMat);
-    bot.position.set((Math.random() - 0.5) * 60, 0.9, (Math.random() - 0.5) * 60);
-    bot.userData = { id: id, hp: 40, targetX: bot.position.x, targetZ: bot.position.z, timer: 0 };
+    const bot = createHumanoidMesh(); // Builds full human shape instead of a cube!
+    bot.position.set((Math.random() - 0.5) * 60, 0, (Math.random() - 0.5) * 60);
+    
+    bot.userData.id = id;
+    bot.userData.hp = 40;
+    bot.userData.targetX = bot.position.x;
+    bot.userData.targetZ = bot.position.z;
+    bot.userData.timer = 0;
+    bot.userData.animTime = Math.random() * 10; // Randomize walk cycles
+
     scene.add(bot);
     bots.push(bot);
 }
-// Add 6 active hunter bots to track across the level
-for (let i = 0; i < 6; i++) spawnBot("Bot_" + i);
+
+// Spawn 6 active custom moving human bots
+for (let i = 0; i < 6; i++) spawnBot("Rival_Bot_" + i);
 
 // --- MULTIPLAYER SETUP (PUBNUB NETWORKING) ---
 function initMultiplayer() {
     pubnub = new PubNub({
-        publishKey: "pub-c-8da6dca2-bdc4-4b95-bfdf-d9d107a6729e", // Public educational sandbox keys
+        publishKey: "pub-c-8da6dca2-bdc4-4b95-bfdf-d9d107a6729e",
         subscribeKey: "sub-c-57d4ccf1-bf63-448e-9c71-337dbeae8488",
         uuid: myID
     });
 
-    // Handle incoming data streams from other players over the internet
     pubnub.addListener({
         message: function(event) {
             const data = event.message;
-            if (event.publisher === myID) return; // Ignore data sent by ourselves
+            if (event.publisher === myID) return;
 
-            // 1. If another player moves, update their 3D avatar clone position live
+            // Update human-shaped multiplayer avatar tracks live
             if (data.type === "move") {
                 if (!networkPlayers[event.publisher]) {
-                    networkPlayers[event.publisher] = new THREE.Mesh(avatarGeo, avatarMat);
+                    networkPlayers[event.publisher] = createHumanoidMesh(); // Other players are human shapes too!
                     scene.add(networkPlayers[event.publisher]);
                     addSystemMessage(`${data.name} joined the active map room.`);
                 }
-                networkPlayers[event.publisher].position.set(data.x, data.y, data.z);
+                networkPlayers[event.publisher].position.set(data.x, 0, data.z);
                 updateLobbyList();
             }
 
-            // 2. If another player shoots an object, sync the visual data
             if (data.type === "shoot_bot") {
                 const targetBot = bots.find(b => b.userData.id === data.botId);
                 if (targetBot) {
                     targetBot.position.set(0, -50, 0); // Hide bot
                     addSystemMessage(`💥 ${data.name} neutralized ${data.botId}!`);
-                    setTimeout(() => { targetBot.position.set((Math.random() - 0.5) * 50, 0.9, (Math.random() - 0.5) * 50); }, 2000);
+                    setTimeout(() => { targetBot.position.set((Math.random() - 0.5) * 50, 0, (Math.random() - 0.5) * 50); }, 2000);
                 }
             }
         },
@@ -98,12 +161,11 @@ function initMultiplayer() {
     pubnub.subscribe({ channels: [ROOM_CHANNEL], withPresence: true });
 }
 
-// Broadcasts your current coordinates over the internet cloud server channel
 function broadcastMovement() {
     if (!pubnub) return;
     pubnub.publish({
         channel: ROOM_CHANNEL,
-        message: { type: "move", name: myName, x: camera.position.x, y: 1.2, z: camera.position.z },
+        message: { type: "move", name: myName, x: camera.position.x, z: camera.position.z },
         storeInHistory: false
     });
 }
@@ -116,7 +178,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
     document.body.requestPointerLock();
     initMultiplayer();
     updateLobbyList();
-    addSystemMessage(`System: Routed successfully. Identity confirmed as ${myName}.`);
+    addSystemMessage(`System: Routed successfully. Connection confirmed as ${myName}.`);
 });
 
 function updateLobbyList() {
@@ -161,41 +223,44 @@ document.addEventListener('mousedown', () => {
     if (document.pointerLockElement !== document.body) return;
 
     raycaster.setFromCamera(screenCenter, camera);
-    const targetHits = raycaster.intersectObjects(bots);
+    
+    // Find intersections with child pieces inside the robot/human character groups
+    const targetHits = raycaster.intersectObjects(scene.children, true);
 
     if (targetHits.length > 0) {
-        const hitBot = targetHits[0].object;
-        hitBot.userData.hp -= 20;
+        // Trace back the clicked piece up to its main parent human group
+        let hitObject = targetHits[0].object;
+        while (hitObject.parent && hitObject.parent !== scene) {
+            hitObject = hitObject.parent;
+        }
 
-        // Visual flash response on impact
-        hitBot.material.color.setHex(0xffffff);
-        setTimeout(() => hitBot.material.color.setHex(0xef4444), 80);
+        if (bots.includes(hitObject)) {
+            hitObject.userData.hp -= 20;
 
-        if (hitBot.userData.hp <= 0) {
-            hitBot.userData.hp = 40;
-            hitBot.position.set(0, -100, 0); // Temporary drop out of world boundaries
+            if (hitObject.userData.hp <= 0) {
+                hitObject.userData.hp = 40;
+                hitObject.position.set(0, -100, 0); // Drop out of view temporarily
 
-            score += 50;
-            document.getElementById('score').innerText = score;
-            addSystemMessage(`🎯 Target destroyed! +50 Match Points.`);
+                score += 50;
+                document.getElementById('score').innerText = score;
+                addSystemMessage(`🎯 Humanoid Drone Down! +50 Match Points.`);
 
-            // Tell all other clients via network that this bot died
-            if(pubnub) {
-                pubnub.publish({
-                    channel: ROOM_CHANNEL,
-                    message: { type: "shoot_bot", name: myName, botId: hitBot.userData.id }
-                });
+                if(pubnub) {
+                    pubnub.publish({
+                        channel: ROOM_CHANNEL,
+                        message: { type: "shoot_bot", name: myName, botId: hitObject.userData.id }
+                    });
+                }
+
+                setTimeout(() => { hitObject.position.set((Math.random() - 0.5) * 60, 0, (Math.random() - 0.5) * 60); }, 2500);
             }
-
-            // Respawn bot in a different location after 2.5 seconds
-            setTimeout(() => { hitBot.position.set((Math.random() - 0.5) * 60, 0.9, (Math.random() - 0.5) * 60); }, 2500);
         }
     }
 });
 
 // --- CORE FRAME RENDER LOOP (60FPS CONTINUOUS REFRESH) ---
 const clock = new THREE.Clock();
-camera.position.set(0, 1.5, 10);
+camera.position.set(0, 1.8, 10); // Elevated camera view to meet character eye positions
 
 function animate() {
     requestAnimationFrame(animate);
@@ -213,34 +278,51 @@ function animate() {
         if (moveL) camera.position.addScaled(right, -speed);
         if (moveR) camera.position.addScaled(right, speed);
 
-        // Every frame you step forward, tell everyone on the web where you are standing
         if (moveF || moveB || moveL || moveR) broadcastMovement();
     }
 
-    // --- ENEMY BOT AI BEHAVIOR LOGIC ---
+    // --- HUMANOID BOT MOVEMENT & WALKING LIMB ANIMATION ---
     bots.forEach(bot => {
         bot.userData.timer += dt;
+        bot.userData.animTime += dt * 7; // Speed of limb swing rate
 
-        // 1. Bots wander randomly towards targets
-        if (bot.userData.timer > 3) {
-            bot.userData.targetX = bot.position.x + (Math.random() - 0.5) * 15;
-            bot.userData.targetZ = bot.position.z + (Math.random() - 0.5) * 15;
+        // 1. Path coordinates recalculator
+        if (bot.userData.timer > 4) {
+            bot.userData.targetX = bot.position.x + (Math.random() - 0.5) * 20;
+            bot.userData.targetZ = bot.position.z + (Math.random() - 0.5) * 20;
             bot.userData.timer = 0;
         }
 
-        // Move bot gently towards wander target coordinates
-        bot.position.x += (bot.userData.targetX - bot.position.x) * dt * 0.5;
-        bot.position.z += (bot.userData.targetZ - bot.position.z) * dt * 0.5;
-        bot.rotation.y += 0.01;
+        // Keep previous spot data to compute angles
+        const oldX = bot.position.x;
+        const oldZ = bot.position.z;
 
-        // 2. Damage Tracking: Check if bot gets close to player position
+        // Smooth translation forward
+        bot.position.x += (bot.userData.targetX - bot.position.x) * dt * 0.4;
+        bot.position.z += (bot.userData.targetZ - bot.position.z) * dt * 0.4;
+
+        // Face the direction they are actively running towards
+        const dx = bot.position.x - oldX;
+        const dz = bot.position.z - oldZ;
+        if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
+            bot.rotation.y = Math.atan2(dx, dz);
+            
+            // 2. RUNNING ANIMATION PHYSICS: Swing legs and arms using math sine waves
+            const swing = Math.sin(bot.userData.animTime) * 0.6;
+            bot.children[2].rotation.x = swing;  // Left Leg forward
+            bot.children[3].rotation.x = -swing; // Right Leg backward
+            bot.children[4].rotation.x = -swing; // Left Arm backward
+            bot.children[5].rotation.x = swing;  // Right Arm forward
+        }
+
+        // Damage Tracker: Check if any bot hunts down and touches player position boundaries
         const dist = camera.position.distanceTo(bot.position);
-        if (dist < 2.2 && hp > 0) {
-            hp -= 15 * dt; // Rapid damage over time if overlapping with hostile bots
+        if (dist < 2.5 && hp > 0) {
+            hp -= 20 * dt;
             document.getElementById('hp').innerText = Math.max(0, Math.floor(hp));
             if (hp <= 0) {
-                addSystemMessage("💀 Critical Damage. Terminal connection drop.");
-                setTimeout(() => { hp = 100; camera.position.set(0, 1.5, 10); }, 3000);
+                addSystemMessage("💀 Critical Failure. Respawning at starting zone...");
+                setTimeout(() => { hp = 100; camera.position.set(0, 1.8, 10); }, 2000);
             }
         }
     });
