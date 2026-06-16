@@ -11,52 +11,82 @@ class Program {
         lobbyPlayers.Add(new Player("Player1_Slither", 100));
         lobbyPlayers.Add(new Player("Player2_Guest", 100));
 
-        // 2. Spawn a massive Raid Boss Drone
+        // 2. Select a Random Map (CoD Style)
+        GameMap currentMap = MapManager.GetRandomMap();
+        Console.WriteLine($"\n[MATCHMAKING] Map Voted: {currentMap.mapName.ToUpper()}!");
+        Console.WriteLine($"[MAP MODIFIER] {currentMap.description}");
+
+        // 3. Spawn the Boss Drone
         Enemy raidBoss = new Enemy("MEGA TITAN RAID BOSS", 250);
 
-        // 3. Give players their weapons
+        // 4. Setup Arsenal (Name, MaxAmmo, BodyDamage, HeadshotMultiplier)
         VRBlaster plasmaPistol = new VRBlaster("Plasma Pistol", 6, 15, 2.0f);
         VRBlaster railGun = new VRBlaster("Heavy Railgun", 2, 45, 1.5f);
 
-        Console.WriteLine($"\n[Server] Match Started! {lobbyPlayers.Count} players vs 1 Boss.");
-        foreach (var p in lobbyPlayers) {
-            p.ShowStatus();
-        }
+        Console.WriteLine($"\n[Server] Match Started on {currentMap.mapName}!");
         raidBoss.ShowStatus();
 
-        // --- TURN 1: Player 1 Attacks ---
+        // --- ROUND 1: Player 1 Attacks ---
         Console.WriteLine($"\n--- [ROUND 1] {lobbyPlayers[0].name}'s Turn ---");
         plasmaPistol.OnGrab(lobbyPlayers[0].name);
-        plasmaPistol.ShootEnemy(raidBoss);
-        plasmaPistol.ShootEnemy(raidBoss);
+        // Map damage modifiers apply here!
+        plasmaPistol.ShootEnemy(raidBoss, currentMap);
 
-        // --- TURN 2: Player 2 Attacks ---
+        // --- ROUND 2: Player 2 Attacks ---
         Console.WriteLine($"\n--- [ROUND 2] {lobbyPlayers[1].name}'s Turn ---");
         railGun.OnGrab(lobbyPlayers[1].name);
-        railGun.ShootEnemy(raidBoss);
+        railGun.ShootEnemy(raidBoss, currentMap);
 
-        // --- TURN 3: Boss Target Selection (Multiplayer Mechanic) ---
+        // --- ROUND 3: Boss Attacks Back ---
         Console.WriteLine("\n--- [BOSS PHASE] Raid Boss Retaliates! ---");
-        // The boss randomly chooses a player in the lobby to attack
-        raidBoss.AttackRandomPlayer(lobbyPlayers, 40);
+        // Tight maps increase enemy damage!
+        int bossDamage = 30 + currentMap.enemyDamageModifier; 
+        raidBoss.AttackRandomPlayer(lobbyPlayers, bossDamage);
 
-        // Show updated server status for both players
-        Console.WriteLine("\n[Server Sync] Updating Player Status:");
+        // Show updated server status
+        Console.WriteLine("\n[Server Sync] Updating Team Status:");
         foreach (var p in lobbyPlayers) {
             p.ShowStatus();
         }
 
-        // --- TURN 4: Combined Firepower ---
+        // --- ROUND 4: Final Assault ---
         Console.WriteLine("\n--- [FINAL ROUND] Combined Fire! ---");
         plasmaPistol.OnGrab(lobbyPlayers[0].name);
-        plasmaPistol.ShootEnemy(raidBoss); // Player 1 shoots
+        plasmaPistol.ShootEnemy(raidBoss, currentMap);
 
         railGun.OnGrab(lobbyPlayers[1].name);
-        railGun.ShootEnemy(raidBoss); // Player 2 shoots
-        railGun.ShootEnemy(raidBoss); // Player 2 finishes it!
+        railGun.ShootEnemy(raidBoss, currentMap);
 
         Console.WriteLine("\n=== Match Ended ===");
         Console.WriteLine($"Team Total Score: {plasmaPistol.score + railGun.score} Points!");
+    }
+}
+
+// ------------------- MAP SYSTEM -------------------
+class GameMap {
+    public string mapName;
+    public string description;
+    public int playerDamageModifier; // Extra damage players deal on this map
+    public int enemyDamageModifier;  // Extra damage enemies deal on this map
+
+    public GameMap(string name, string desc, int playerMod, int enemyMod) {
+        mapName = name;
+        description = desc;
+        playerDamageModifier = playerMod;
+        enemyDamageModifier = enemyMod;
+    }
+}
+
+class MapManager {
+    public static GameMap GetRandomMap() {
+        List<GameMap> maps = new List<GameMap>();
+        // Add classic style maps
+        maps.Add(new GameMap("Shipment (CQC)", "Ultra tight spaces! Enemy attacks deal +15 more damage!", 0, 15));
+        maps.Add(new GameMap("Rust (Desert)", "High ground advantages! All players deal +10 bonus damage!", 10, 0));
+        maps.Add(new GameMap("Cyber Neon (Rivals Arena)", "Perfectly balanced test arena. No modifiers.", 0, 0));
+
+        Random rand = new Random();
+        return maps[rand.Next(0, maps.Count)];
     }
 }
 
@@ -103,14 +133,13 @@ class Enemy {
         }
     }
 
-    // Multiplayer Attack Logic: Picks a random player from the list
     public void AttackRandomPlayer(List<Player> players, int damage) {
         if (isDefeated || players.Count == 0) return;
 
         int targetIndex = rand.Next(0, players.Count);
         Player targetPlayer = players[targetIndex];
 
-        Console.WriteLine($"*🚨 LOCK ON!* {name} targets and blasts {targetPlayer.name} for {damage} damage!");
+        Console.WriteLine($"*🚨 LOCK ON* On this map, {name} hits {targetPlayer.name} for {damage} damage!");
         targetPlayer.health -= damage;
     }
 }
@@ -135,36 +164,31 @@ class VRBlaster {
         headshotMultiplier = multiplier;
     }
 
-    // Pass the player's name so the server knows who picked it up
     public void OnGrab(string playerName) {
         currentHolder = playerName;
         Console.WriteLine($"[Network Sync] {playerName} equipped the {objectName}.");
     }
 
-    public void ShootEnemy(Enemy target) {
-        if (currentHolder == "None") {
-            Console.WriteLine("❌ Error: Gun is not held by any network player.");
-            return;
-        }
-
-        if (target.isDefeated) {
-            Console.WriteLine($"*Click* {target.name} is already down.");
-            return;
-        }
+    // Now accepts the active map to check for damage bonuses
+    public void ShootEnemy(Enemy target, GameMap activeMap) {
+        if (currentHolder == "None") return;
+        if (target.isDefeated) return;
 
         if (ammoCount > 0) {
             ammoCount--;
             
-            bool isHeadshot = randomGenerator.Next(0, 100) < 35; // 35% headshot chance
-            int finalDamage = baseDamage;
+            bool isHeadshot = randomGenerator.Next(0, 100) < 35;
+            // Add map damage bonus to base damage
+            int mapBaseDamage = baseDamage + activeMap.playerDamageModifier;
+            int finalDamage = mapBaseDamage;
             
             if (isHeadshot) {
-                finalDamage = (int)(baseDamage * headshotMultiplier);
+                finalDamage = (int)(mapBaseDamage * headshotMultiplier);
                 score += 30;
-                Console.WriteLine($"🎯 [HEADSHOT!] {currentHolder} hit a CRITICAL shot with {objectName}! Dealt {finalDamage} damage to {target.name}!");
+                Console.WriteLine($"🎯 [HEADSHOT!] {currentHolder} scored a CRIT on {activeMap.mapName}! Dealt {finalDamage} damage to {target.name}!");
             } else {
                 score += 10;
-                Console.WriteLine($"💥 [Body Shot] {currentHolder} shot {target.name} with {objectName} for {finalDamage} damage.");
+                Console.WriteLine($"💥 [Body Shot] {currentHolder} hit {target.name} for {finalDamage} damage.");
             }
 
             target.health -= finalDamage;
@@ -172,19 +196,19 @@ class VRBlaster {
             if (target.health <= 0) {
                 target.health = 0;
                 target.isDefeated = true;
-                score += 150; // Big multiplayer boss kill bonus!
-                Console.WriteLine($"🏆 BOSS DESTROYED! {currentHolder} landed the final blow!");
+                score += 150;
+                Console.WriteLine($"🏆 MATCH WINNER! {currentHolder} secured the final kill on {activeMap.mapName}!");
             }
             target.ShowStatus();
         } else {
-            Console.WriteLine($"*Click Click* {objectName} is empty! {currentHolder} is reloading...");
+            Console.WriteLine($"*Click Click* {objectName} is empty! Automatic reload...");
             Reload();
-            ShootEnemy(target);
+            ShootEnemy(target, activeMap);
         }
     }
 
     public void Reload() {
         ammoCount = maxAmmo;
-        Console.WriteLine($"*Ch-Chck!* {objectName} reloaded back to {maxAmmo} shots.");
+        Console.WriteLine($"*Ch-Chck!* {objectName} reloaded.");
     }
 }
